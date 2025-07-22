@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kreait\Firebase\Tests\Unit\Database\Query\Filter;
 
 use GuzzleHttp\Psr7\Uri;
+use Iterator;
 use Kreait\Firebase\Database\Query\Filter\StartAfter;
 use Kreait\Firebase\Tests\UnitTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -21,17 +22,12 @@ final class StartAfterTest extends UnitTestCase
     {
         $filter = new StartAfter($given);
 
-        $this->assertStringContainsString($expected, (string) $filter->modifyUri(new Uri('http://domain.example')));
+        $this->assertStringContainsString($expected, (string) $filter->modifyUri(new Uri('https://example.com')));
     }
 
-    /**
-     * @return array<string, array<int, int|string>>
-     */
-    public static function valueProvider()
+    public static function valueProvider(): Iterator
     {
-        return [
-            'int' => [1, 'startAfter=1'],
-            'string' => ['value', 'startAfter=%22value%22'],
-        ];
+        yield 'int' => [1, 'startAfter=1'];
+        yield 'string' => ['value', 'startAfter=%22value%22'];
     }
 }

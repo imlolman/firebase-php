@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kreait\Firebase\Tests\Integration;
 
+use Iterator;
 use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Exception\Messaging\InvalidArgument;
 use Kreait\Firebase\Exception\Messaging\InvalidMessage;
@@ -14,6 +15,7 @@ use Kreait\Firebase\Messaging\RawMessageFromArray;
 use Kreait\Firebase\Messaging\WebPushConfig;
 use Kreait\Firebase\Tests\IntegrationTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
 use PHPUnit\Framework\Attributes\Test;
 
 /**
@@ -31,7 +33,7 @@ final class MessagingTest extends IntegrationTestCase
     }
 
     /**
-     * @return array<string, array<string, mixed>>
+     * @return array<string, mixed>
      */
     public static function createFullMessageData(): array
     {
@@ -40,7 +42,7 @@ final class MessagingTest extends IntegrationTestCase
                 // https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#notification
                 'title' => 'Notification title',
                 'body' => 'Notification body',
-                'image' => 'http://lorempixel.com/400/200/',
+                'image' => 'https://picsum.photos/400/200',
             ],
             'data' => [
                 'key_1' => 'Value 1',
@@ -133,34 +135,43 @@ final class MessagingTest extends IntegrationTestCase
     #[Test]
     public function sendingAMessageWithEmptyMessageDataShouldNotFail(): void
     {
-        $message = CloudMessage::withTarget('token', $this->getTestRegistrationToken())
+        $message = CloudMessage::new()
             ->withData([])
+            ->toToken($this->getTestRegistrationToken());
         ;
 
-        $this->messaging->send($message);
-        $this->addToAssertionCount(1);
+        $result = $this->messaging->send($message);
+
+        $this->assertArrayHasKey('name', $result);
+        $this->assertIsString($result['name']);
+        $this->assertMatchesRegularExpression('~^projects/[^/]+/messages/.+~', $result['name']);
     }
 
+    /**
+     * @param non-empty-string $keyword
+     */
     #[DataProvider('reservedKeywordsThatStillAreAccepted')]
     #[Test]
     public function sendMessageWithReservedKeywordInMessageDataThatIsStillAccepted(string $keyword): void
     {
-        $message = CloudMessage::withTarget('token', $this->getTestRegistrationToken())
+        $message = CloudMessage::new()
             ->withData([$keyword => 'value'])
+            ->toToken($this->getTestRegistrationToken());
         ;
 
+        $result = $this->messaging->send($message);
+
+        $this->assertArrayHasKey('name', $result);
+        $this->assertIsString($result['name']);
+        $this->assertMatchesRegularExpression('~^projects/[^/]+/messages/.+~', $result['name']);
+
+        // This shouldn't throw an exception
         $this->messaging->send($message);
-        $this->addToAssertionCount(1);
     }
 
-    /**
-     * @return array<string, string[]>
-     */
-    public static function reservedKeywordsThatStillAreAccepted(): array
+    public static function reservedKeywordsThatStillAreAccepted(): Iterator
     {
-        return [
-            'notification' => ['notification'],
-        ];
+        yield 'notification' => ['notification'];
     }
 
     #[Test]
@@ -205,10 +216,11 @@ final class MessagingTest extends IntegrationTestCase
         $success = $report->successes()->getItems()[0];
         $this->assertSame($valid, $success->target()->value());
         $this->assertIsArray($success->result());
-        $this->assertArrayHasKey('name', $success->result() ?: []);
+        $this->assertArrayHasKey('name', $success->result());
 
         $failure = $report->failures()->getItems()[0];
         $this->assertSame($invalid, $failure->target()->value());
+        $this->assertTrue($failure->messageWasInvalid());
         $this->assertInstanceOf(MessagingException::class, $failure->error());
     }
 
@@ -228,7 +240,7 @@ final class MessagingTest extends IntegrationTestCase
 
         $this->assertTrue($report->hasFailures());
         $this->assertCount(2, $report->failures());
-        $this->assertCount(0, $report->successes());
+        $this->assertEmpty($report->successes());
 
         $items = $report->failures()->getItems();
 
@@ -260,10 +272,10 @@ final class MessagingTest extends IntegrationTestCase
         $message = CloudMessage::new()->withNotification(['title' => 'Token Notification', 'body' => 'Token body']);
         $invalidMessage = new RawMessageFromArray(['invalid' => 'message']);
 
-        $tokenMessage = $message->withChangedTarget('token', $token);
-        $topicMessage = $message->withChangedTarget('topic', $topic);
-        $conditionMessage = $message->withChangedTarget('condition', $condition);
-        $invalidToken = $message->withChangedTarget('token', $invalidToken);
+        $tokenMessage = $message->toToken($token);
+        $topicMessage = $message->toTopic($topic);
+        $conditionMessage = $message->toCondition($condition);
+        $invalidToken = $message->toToken($invalidToken);
 
         $messages = [$tokenMessage, $topicMessage, $conditionMessage, $invalidToken, $invalidMessage];
 
@@ -393,5 +405,20 @@ final class MessagingTest extends IntegrationTestCase
 
             throw $e;
         }
+    }
+
+    #[Test]
+    #[DoesNotPerformAssertions]
+    public function sendWebPushNotificationWithAnEmptyTitle(): void
+    {
+        $message = CloudMessage::new()
+            ->withWebPushConfig(WebPushConfig::fromArray([
+                'notification' => [
+                    'title' => '',
+                ],
+            ]))
+            ->toToken($this->getTestRegistrationToken());
+
+        $this->messaging->send($message);
     }
 }

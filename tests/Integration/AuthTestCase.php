@@ -14,11 +14,14 @@ use Kreait\Firebase\Auth\SendActionLink\FailedToSendActionLink;
 use Kreait\Firebase\Auth\SignIn\FailedToSignIn;
 use Kreait\Firebase\Auth\UserRecord;
 use Kreait\Firebase\Contract\Auth;
+use Kreait\Firebase\Contract\Transitional\FederatedUserFetcher;
 use Kreait\Firebase\Exception\Auth\InvalidOobCode;
 use Kreait\Firebase\Exception\Auth\RevokedIdToken;
 use Kreait\Firebase\Exception\Auth\RevokedSessionCookie;
 use Kreait\Firebase\Exception\Auth\UserNotFound;
 use Kreait\Firebase\Tests\IntegrationTestCase;
+use Kreait\Firebase\Util;
+use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
 use PHPUnit\Framework\Attributes\Test;
 
 use function assert;
@@ -37,10 +40,14 @@ use const PHP_URL_QUERY;
  */
 abstract class AuthTestCase extends IntegrationTestCase
 {
-    /**
-     * @phpstan-ignore-next-line
-     */
     protected Auth $auth;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->auth = self::$factory->createAuth();
+    }
 
     #[Test]
     public function createAnonymousUser(): void
@@ -60,11 +67,19 @@ abstract class AuthTestCase extends IntegrationTestCase
         $email = self::randomEmail(__FUNCTION__);
 
         $user = $this->auth->createUserWithEmailAndPassword($email, 'old password');
+        $this->auth->signInWithEmailAndPassword($email, 'old password');
 
         $this->auth->changeUserPassword($user->uid, 'new password');
+        $updatedUser = $this->auth->signInWithEmailAndPassword($email, 'new password');
 
-        $this->auth->deleteUser($user->uid);
-        $this->addToAssertionCount(1);
+        assert($updatedUser->firebaseUserId() === $user->uid);
+
+        try {
+            $this->expectException(FailedToSignIn::class);
+            $this->auth->signInWithEmailAndPassword($email, 'old password');
+        } finally {
+            $this->auth->deleteUser($user->uid);
+        }
     }
 
     #[Test]
@@ -89,24 +104,25 @@ abstract class AuthTestCase extends IntegrationTestCase
     public function getEmailVerificationLink(): void
     {
         $user = $this->createUserWithEmailAndPassword();
+        assert(is_string($user->email));
 
         try {
-            $this->auth->getEmailVerificationLink((string) $user->email);
-            $this->addToAssertionCount(1);
+            $link = $this->auth->getEmailVerificationLink($user->email);
+            $this->assertMatchesRegularExpression('~^https?://.+/action\?mode=verifyemail~i', $link);
         } finally {
             $this->auth->deleteUser($user->uid);
         }
     }
 
+    #[DoesNotPerformAssertions]
     #[Test]
     public function sendEmailVerificationLink(): void
     {
         $user = $this->createUserWithEmailAndPassword();
+        assert(is_string($user->email));
 
         try {
-            $this->auth->sendEmailVerificationLink((string) $user->email);
-            // We can't test the reception, but if we don't get an error, we consider it working
-            $this->addToAssertionCount(1);
+            $this->auth->sendEmailVerificationLink($user->email);
         } finally {
             $this->auth->deleteUser($user->uid);
         }
@@ -123,12 +139,13 @@ abstract class AuthTestCase extends IntegrationTestCase
     public function sendEmailVerificationLinkToDisabledUser(): void
     {
         $user = $this->createUserWithEmailAndPassword();
+        assert(is_string($user->email));
 
         try {
             $this->auth->disableUser($user->uid);
 
             $this->expectException(FailedToSendActionLink::class);
-            $this->auth->sendEmailVerificationLink((string) $user->email);
+            $this->auth->sendEmailVerificationLink($user->email);
         } finally {
             $this->auth->deleteUser($user->uid);
         }
@@ -138,24 +155,26 @@ abstract class AuthTestCase extends IntegrationTestCase
     public function getPasswordResetLink(): void
     {
         $user = $this->createUserWithEmailAndPassword();
+        assert(is_string($user->email));
 
         try {
-            $this->auth->getPasswordResetLink((string) $user->email);
-            $this->addToAssertionCount(1);
+            $link = $this->auth->getPasswordResetLink($user->email);
+            $this->assertMatchesRegularExpression('~^https?://.+/action\?mode=resetpassword~i', $link);
         } finally {
             $this->auth->deleteUser($user->uid);
         }
     }
 
+    #[DoesNotPerformAssertions]
     #[Test]
     public function sendPasswordResetLink(): void
     {
         $user = $this->createUserWithEmailAndPassword();
+        assert(is_string($user->email));
 
         try {
-            $this->auth->sendPasswordResetLink((string) $user->email);
+            $this->auth->sendPasswordResetLink($user->email);
             // We can't test the reception, but if we don't get an error, we consider it working
-            $this->addToAssertionCount(1);
         } finally {
             $this->auth->deleteUser($user->uid);
         }
@@ -165,16 +184,17 @@ abstract class AuthTestCase extends IntegrationTestCase
     public function getSignInWithEmailLink(): void
     {
         $user = $this->createUserWithEmailAndPassword();
-        assert($user->email !== null);
+        assert(is_string($user->email));
 
         try {
-            $this->auth->getSignInWithEmailLink($user->email);
-            $this->addToAssertionCount(1);
+            $link = $this->auth->getSignInWithEmailLink($user->email);
+            $this->assertMatchesRegularExpression('~^https?://.+/action\?mode=signin~i', $link);
         } finally {
             $this->auth->deleteUser($user->uid);
         }
     }
 
+    #[DoesNotPerformAssertions]
     #[Test]
     public function sendSignInWithEmailLink(): void
     {
@@ -183,7 +203,6 @@ abstract class AuthTestCase extends IntegrationTestCase
         try {
             $this->auth->sendSignInWithEmailLink((string) $user->email);
             // We can't test the reception, but if we don't get an error, we consider it working
-            $this->addToAssertionCount(1);
         } finally {
             $this->auth->deleteUser($user->uid);
         }
@@ -200,14 +219,18 @@ abstract class AuthTestCase extends IntegrationTestCase
     public function getLocalizedEmailActionLink(): void
     {
         $user = $this->createUserWithEmailAndPassword();
-        $this->assertIsString($user->email);
+        assert(is_string($user->email));
 
-        $link = $this->auth->getEmailVerificationLink($user->email, null, 'fr');
+        try {
+            $link = $this->auth->getEmailVerificationLink($user->email, null, 'fr');
 
-        if (self::authIsEmulated()) {
-            $this->assertStringNotContainsString('lang=fr', $link);
-        } else {
-            $this->assertStringContainsString('lang=fr', $link);
+            if (Util::authEmulatorHost() !== null) {
+                $this->assertStringNotContainsString('lang=fr', $link);
+            } else {
+                $this->assertStringContainsString('lang=fr', $link);
+            }
+        } finally {
+            $this->auth->deleteUser($user->uid);
         }
     }
 
@@ -254,8 +277,6 @@ abstract class AuthTestCase extends IntegrationTestCase
             $verifiedToken = $this->auth->verifyIdToken($idToken);
 
             $this->assertSame($uid, $verifiedToken->claims()->get('sub'));
-
-            $this->addToAssertionCount(1);
         } finally {
             $this->auth->deleteUser($uid);
         }
@@ -309,8 +330,8 @@ abstract class AuthTestCase extends IntegrationTestCase
     {
         $signInResult = $this->auth->signInAnonymously();
 
-        /** @var string $uid */
         $uid = $signInResult->firebaseUserId();
+        assert($uid !== null);
 
         try {
             $idToken = $signInResult->idToken();
@@ -331,8 +352,8 @@ abstract class AuthTestCase extends IntegrationTestCase
     {
         $signInResult = $this->auth->signInAnonymously();
 
-        /** @var string $uid */
         $uid = $signInResult->firebaseUserId();
+        assert($uid !== null);
 
         try {
             $idToken = $signInResult->idToken();
@@ -441,7 +462,7 @@ abstract class AuthTestCase extends IntegrationTestCase
         try {
             $this->assertInstanceOf(UserRecord::class, $check[$one->uid]);
             $this->assertInstanceOf(UserRecord::class, $check[$two->uid]);
-            $this->assertNull($check['non_existing']);
+            $this->assertNotInstanceOf(UserRecord::class, $check['non_existing']);
         } finally {
             $this->auth->deleteUser($one->uid);
             $this->auth->deleteUser($two->uid);
@@ -501,6 +522,50 @@ abstract class AuthTestCase extends IntegrationTestCase
     }
 
     #[Test]
+    public function getUserByProviderUid(): void
+    {
+        if (Util::authEmulatorHost() === null) {
+            $this->markTestSkipped('Getting user by provider UID can only be tested with the Firebase emulator.');
+        }
+
+        $auth = $this->auth;
+        if (!($auth instanceof FederatedUserFetcher)) {
+            $this->markTestSkipped('This test requires a FederatedUserFetcher implementation.');
+        }
+
+        $phoneNumber = '+1234567'.random_int(1000, 9999);
+
+        $user = $this->auth->createUser([
+            'phoneNumber' => $phoneNumber,
+        ]);
+
+        $check = $auth->getUserByProviderUid('phone', "$phoneNumber");
+
+        try {
+            $this->assertSame($user->uid, $check->uid);
+        } finally {
+            $auth->deleteUser($user->uid);
+        }
+
+    }
+
+    #[Test]
+    public function getUserByNonExistingProviderUid(): void
+    {
+        if (Util::authEmulatorHost() === null) {
+            $this->markTestSkipped('Getting user by provider UID can only be tested with the Firebase emulator.');
+        }
+
+        $auth = $this->auth;
+        if (!($auth instanceof FederatedUserFetcher)) {
+            $this->markTestSkipped('This test requires a FederatedUserFetcher implementation.');
+        }
+
+        $this->expectException(UserNotFound::class);
+        $auth->getUserByProviderUid('phone', '+192837465');
+    }
+
+    #[Test]
     public function createUser(): void
     {
         $uid = bin2hex(random_bytes(5));
@@ -516,15 +581,6 @@ abstract class AuthTestCase extends IntegrationTestCase
         $this->assertSame($email, $userRecord->email);
 
         $this->auth->deleteUser($uid);
-    }
-
-    #[Test]
-    public function updateUserWithUidAsAdditionalArgument(): void
-    {
-        $user = $this->auth->createUser([]);
-        $this->auth->updateUser($user->uid, []);
-        $this->auth->deleteUser($user->uid);
-        $this->addToAssertionCount(1);
     }
 
     #[Test]
@@ -571,7 +627,7 @@ abstract class AuthTestCase extends IntegrationTestCase
 
         $this->assertSame(3, $result->successCount());
         $this->assertSame(0, $result->failureCount());
-        $this->assertCount(0, $result->rawErrors());
+        $this->assertEmpty($result->rawErrors());
     }
 
     #[Test]
@@ -642,7 +698,7 @@ abstract class AuthTestCase extends IntegrationTestCase
 
         $url = $this->auth->getPasswordResetLink($user->email);
 
-        parse_str(parse_url($url, PHP_URL_QUERY), $query);
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
 
         $email = $this->auth->confirmPasswordReset($query['oobCode'], 'newPassword123');
 
@@ -663,7 +719,7 @@ abstract class AuthTestCase extends IntegrationTestCase
 
         $queryString = parse_url($url, PHP_URL_QUERY);
 
-        parse_str($queryString, $query);
+        parse_str((string) $queryString, $query);
 
         $email = $this->auth->confirmPasswordReset($query['oobCode'], 'newPassword123', true);
         sleep(1); // wait for a second
@@ -779,20 +835,28 @@ abstract class AuthTestCase extends IntegrationTestCase
     {
         $result = $this->auth->signInAnonymously();
 
-        $idToken = $result->idToken();
+        $uid = $result->firebaseUserId();
+        $this->assertIsString($uid);
 
+        $idToken = $result->idToken();
         $this->assertIsString($idToken);
+
         $this->assertNull($result->accessToken());
         $this->assertIsString($result->refreshToken());
         $this->assertIsString($result->firebaseUserId());
 
         $token = $this->auth->parseToken($idToken);
 
-        $this->assertIsString($uid = $token->claims()->get('sub'));
-        $user = $this->auth->getUser($uid);
-        $this->addToAssertionCount(1);
+        $uid = $token->claims()->get('sub');
 
-        $this->auth->deleteUser($user->uid);
+        $this->assertIsString($uid);
+        $this->assertNotEmpty($uid);
+
+        // This should not throw an exception because the user exists
+        $this->auth->getUser($uid);
+
+        // Clean up
+        $this->auth->deleteUser($uid);
     }
 
     #[Test]
@@ -837,16 +901,17 @@ abstract class AuthTestCase extends IntegrationTestCase
     {
         $signInResult = $this->auth->signInAnonymously();
         $uid = $signInResult->firebaseUserId();
-        assert(is_string($uid));
+        $this->assertIsString($uid);
 
         try {
             $idToken = $signInResult->idToken();
             $this->assertIsString($idToken);
 
+            // The token should be parsed without throwing an exception
             $parsedToken = $this->auth->parseToken($idToken);
-            $this->auth->verifyIdToken($parsedToken);
 
-            $this->addToAssertionCount(1);
+            // The token should be verified without throwing an exception
+            $this->auth->verifyIdToken($parsedToken);
         } finally {
             $this->auth->deleteUser($uid);
         }

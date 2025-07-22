@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kreait\Firebase\Tests\Unit\Messaging;
 
+use Iterator;
 use Kreait\Firebase\Exception\Messaging\InvalidArgument;
 use Kreait\Firebase\Messaging\Condition;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -36,32 +37,22 @@ final class ConditionTest extends TestCase
         $valid = "'a' in topics && 'b' in topics || 'c' in topics || 'd' in topics || 'e' in topics";
         $invalid = $valid." || 'f' in topics";
 
+        // This should not throw an exception
         Condition::fromValue($valid);
-        $this->addToAssertionCount(1);
 
         $this->expectException(InvalidArgument::class);
         Condition::fromValue($invalid);
     }
 
-    /**
-     * @return array<string, array<int, string>>
-     */
-    public static function valueProvider(): array
+    public static function valueProvider(): Iterator
     {
-        return [
-            'single quotes' => ["'dogs' in topics || 'cats' in topics", "'dogs' in topics || 'cats' in topics"],
-            'double quotes' => ["'dogs' in topics || 'cats' in topics", '"dogs" in topics || "cats" in topics'],
-        ];
+        yield 'single quotes' => ["'dogs' in topics || 'cats' in topics", "'dogs' in topics || 'cats' in topics"];
+        yield 'double quotes' => ["'dogs' in topics || 'cats' in topics", '"dogs" in topics || "cats" in topics'];
     }
 
-    /**
-     * @return array<string, array<int, string>>
-     */
-    public static function invalidValueProvider(): array
+    public static function invalidValueProvider(): Iterator
     {
-        return [
-            'single quotes' => ["'dogs in Topics"],
-            'double quotes' => ["'dogs in Topics || 'cats' in topics"],
-        ];
+        yield 'single quotes' => ["'dogs in Topics"];
+        yield 'double quotes' => ["'dogs in Topics || 'cats' in topics"];
     }
 }

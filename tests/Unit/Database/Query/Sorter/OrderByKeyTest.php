@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kreait\Firebase\Tests\Unit\Database\Query\Sorter;
 
 use GuzzleHttp\Psr7\Uri;
+use Iterator;
 use Kreait\Firebase\Database\Query\Sorter\OrderByKey;
 use Kreait\Firebase\Tests\UnitTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -17,7 +18,7 @@ use function rawurlencode;
  */
 final class OrderByKeyTest extends UnitTestCase
 {
-    protected OrderByKey $sorter;
+    private OrderByKey $sorter;
 
     protected function setUp(): void
     {
@@ -29,40 +30,35 @@ final class OrderByKeyTest extends UnitTestCase
     {
         $this->assertStringContainsString(
             'orderBy='.rawurlencode('"$key"'),
-            (string) $this->sorter->modifyUri(new Uri('http://domain.example')),
+            (string) $this->sorter->modifyUri(new Uri('https://example.com')),
         );
     }
 
     #[DataProvider('valueProvider')]
     #[Test]
-    public function modifyValue(mixed $expected, mixed $value): void
+    public function modifyValue(mixed $expected, mixed $given): void
     {
-        $this->assertSame($expected, $this->sorter->modifyValue($value));
+        $this->assertSame($expected, $this->sorter->modifyValue($given));
     }
 
-    /**
-     * @return array<string, array<string, mixed>>
-     */
-    public static function valueProvider(): array
+    public static function valueProvider(): Iterator
     {
-        return [
-            'scalar' => [
-                'expected' => 'scalar',
-                'given' => 'scalar',
+        yield 'scalar' => [
+            'scalar',
+            'scalar',
+        ];
+        yield 'array' => [
+            [
+                'a' => 'any',
+                'b' => 'any',
+                'c' => 'any',
+                'd' => 'any',
             ],
-            'array' => [
-                'expected' => [
-                    'a' => 'any',
-                    'b' => 'any',
-                    'c' => 'any',
-                    'd' => 'any',
-                ],
-                'given' => [
-                    'c' => 'any',
-                    'a' => 'any',
-                    'd' => 'any',
-                    'b' => 'any',
-                ],
+            [
+                'c' => 'any',
+                'a' => 'any',
+                'd' => 'any',
+                'b' => 'any',
             ],
         ];
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kreait\Firebase\Tests\Unit\Messaging;
 
 use Beste\Json;
+use Iterator;
 use Kreait\Firebase\Messaging\ApnsConfig;
 use Kreait\Firebase\Tests\UnitTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -24,16 +25,16 @@ final class ApnsConfigTest extends UnitTestCase
     #[Test]
     public function itHasADefaultSound(): void
     {
-        $expected = [
+        $config = ApnsConfig::fromArray([
             'payload' => [
                 'aps' => [
                     'sound' => 'default',
                 ],
             ],
-        ];
+        ]);
 
         $this->assertJsonStringEqualsJsonString(
-            Json::encode($expected),
+            Json::encode($config),
             Json::encode(ApnsConfig::new()->withDefaultSound()),
         );
     }
@@ -41,16 +42,16 @@ final class ApnsConfigTest extends UnitTestCase
     #[Test]
     public function itHasABadge(): void
     {
-        $expected = [
+        $config = ApnsConfig::fromArray([
             'payload' => [
                 'aps' => [
                     'badge' => 123,
                 ],
             ],
-        ];
+        ]);
 
         $this->assertJsonStringEqualsJsonString(
-            Json::encode($expected),
+            Json::encode($config),
             Json::encode(ApnsConfig::new()->withBadge(123)),
         );
     }
@@ -62,60 +63,86 @@ final class ApnsConfigTest extends UnitTestCase
     #[Test]
     public function itCanBeCreatedFromAnArray(array $data): void
     {
-        $config = ApnsConfig::fromArray($data);
+        $this->assertJsonStringEqualsJsonString(
+            Json::encode($data),
+            Json::encode(ApnsConfig::fromArray($data)),
+        );
+    }
 
-        $this->assertEqualsCanonicalizing($data, $config->jsonSerialize());
+    public function itCanBeGivenData(): void
+    {
+        $config = ApnsConfig::fromArray(['data' => ['key' => 'value']]);
+
+        $this->assertJsonStringEqualsJsonString(
+            Json::encode($config),
+            Json::encode(ApnsConfig::new()->withDataField('key', 'value')),
+        );
     }
 
     #[Test]
-    public function itCanHaveAPriority(): void
+    public function itCanHaveAnImmediatePriority(): void
     {
-        $config = ApnsConfig::new()->withImmediatePriority();
-        $this->assertSame('10', $config->jsonSerialize()['headers']['apns-priority']);
+        $config = ApnsConfig::fromArray(['headers' => ['apns-priority' => '10']]);
 
-        $config = ApnsConfig::new()->withPowerConservingPriority();
-        $this->assertSame('5', $config->jsonSerialize()['headers']['apns-priority']);
+        $this->assertJsonStringEqualsJsonString(
+            Json::encode($config),
+            Json::encode(ApnsConfig::new()->withImmediatePriority()),
+        );
+    }
+
+    #[Test]
+    public function itCanHaveAPowerConservingPriority(): void
+    {
+        $config = ApnsConfig::fromArray(['headers' => ['apns-priority' => '5']]);
+
+        $this->assertJsonStringEqualsJsonString(
+            Json::encode($config),
+            Json::encode(ApnsConfig::new()->withPowerConservingPriority()),
+        );
+    }
+
+    #[Test]
+    public function itCanBeGivenALiveActivityTokenInsideAnArray(): void
+    {
+        $config = ApnsConfig::fromArray(['live_activity_token' => 'token']);
+
+        $this->assertJsonStringEqualsJsonString(
+            Json::encode($config),
+            Json::encode(ApnsConfig::new()->withLiveActivityToken('token')),
+        );
     }
 
     #[Test]
     public function itHasASubtitle(): void
     {
-        $expected = [
-            'payload' => [
-                'aps' => [
-                    'subtitle' => 'i am a subtitle',
-                ],
-            ],
-        ];
+        $config = ApnsConfig::fromArray([
+            'payload' => ['aps' => ['subtitle' => 'subtitle']],
+        ]);
 
         $this->assertJsonStringEqualsJsonString(
-            Json::encode($expected),
-            Json::encode(ApnsConfig::new()->withSubtitle('i am a subtitle')),
+            Json::encode($config),
+            Json::encode(ApnsConfig::new()->withSubtitle('subtitle')),
         );
     }
 
-    /**
-     * @return array<string, array<int, array<string, mixed>>>
-     */
-    public static function validDataProvider()
+    public static function validDataProvider(): Iterator
     {
-        return [
-            'full_config' => [[
-                // https://firebase.google.com/docs/cloud-messaging/admin/send-messages#apns_specific_fields
-                'headers' => [
-                    'apns-priority' => '10',
-                ],
-                'payload' => [
-                    'aps' => [
-                        'alert' => [
-                            'title' => '$GOOGLE up 1.43% on the day',
-                            'body' => '$GOOGLE gained 11.80 points to close at 835.67, up 1.43% on the day.',
-                        ],
-                        'badge' => 42,
-                        'sound' => 'default',
+        yield 'full_config' => [[
+            // https://firebase.google.com/docs/cloud-messaging/admin/send-messages#apns_specific_fields
+            'headers' => [
+                'apns-priority' => '10',
+            ],
+            'payload' => [
+                'aps' => [
+                    'alert' => [
+                        'title' => '$GOOGLE up 1.43% on the day',
+                        'body' => '$GOOGLE gained 11.80 points to close at 835.67, up 1.43% on the day.',
                     ],
+                    'badge' => 42,
+                    'sound' => 'default',
                 ],
-            ]],
-        ];
+            ],
+            'live_activity_token' => 'token',
+        ]];
     }
 }

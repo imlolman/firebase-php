@@ -15,6 +15,8 @@ final class TenantAwareAuthTest extends AuthTestCase
 {
     protected function setUp(): void
     {
+        parent::setUp();
+
         if (self::$tenantId === null) {
             $this->markTestSkipped('Tenant aware tests require a tenant ID');
         }
@@ -56,7 +58,8 @@ final class TenantAwareAuthTest extends AuthTestCase
         }
     }
 
-    public function it_can_sign_in_anonymously(): void
+    #[Test]
+    public function itCanSignInAnonymously(): void
     {
         $user = $this->auth->createAnonymousUser();
         $result = $this->auth->signInAsUser($user);

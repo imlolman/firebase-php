@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kreait\Firebase\Tests\Unit\Auth\ActionCodeSettings;
 
 use InvalidArgumentException;
+use Iterator;
 use Kreait\Firebase\Auth\ActionCodeSettings\ValidatedActionCodeSettings;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -39,42 +40,36 @@ final class ValidatedActionSettingsTest extends TestCase
         $this->assertEmpty(ValidatedActionCodeSettings::empty()->toArray());
     }
 
-    /**
-     * @return array<string, array<int, array<string, mixed>>>
-     */
-    public static function validInputs(): array
+    public static function validInputs(): Iterator
     {
-        $continueUrl = 'https://domain.example';
-
-        return [
-            'full' => [
-                [
-                    'continueUrl' => $continueUrl,
-                    'handleCodeInApp' => true,
-                    'dynamicLinkDomain' => 'https://dynamic.tld',
-                    'androidPackageName' => 'locale.vendor.name',
-                    'androidMinimumVersion' => '1.0',
-                    'androidInstallApp' => true,
-                    'iOSBundleId' => 'id.tld.domain.subdomain',
-                ],
-                [
-                    'continueUrl' => $continueUrl,
-                    'canHandleCodeInApp' => true,
-                    'dynamicLinkDomain' => 'https://dynamic.tld',
-                    'androidPackageName' => 'locale.vendor.name',
-                    'androidMinimumVersion' => '1.0',
-                    'androidInstallApp' => true,
-                    'iOSBundleId' => 'id.tld.domain.subdomain',
-                ],
+        $continueUrl = 'https://example.com';
+        yield 'full' => [
+            [
+                'continueUrl' => $continueUrl,
+                'handleCodeInApp' => true,
+                'dynamicLinkDomain' => 'https://dynamic.example.com',
+                'androidPackageName' => 'locale.vendor.name',
+                'androidMinimumVersion' => '1.0',
+                'androidInstallApp' => true,
+                'iOSBundleId' => 'id.tld.domain.subdomain',
             ],
-            'url_alias' => [
-                ['url' => $continueUrl],
-                ['continueUrl' => $continueUrl],
+            [
+                'continueUrl' => $continueUrl,
+                'canHandleCodeInApp' => true,
+                'dynamicLinkDomain' => 'https://dynamic.example.com',
+                'androidPackageName' => 'locale.vendor.name',
+                'androidMinimumVersion' => '1.0',
+                'androidInstallApp' => true,
+                'iOSBundleId' => 'id.tld.domain.subdomain',
             ],
-            'handle_to_can_handle' => [
-                ['handleCodeInApp' => false],
-                ['canHandleCodeInApp' => false],
-            ],
+        ];
+        yield 'url_alias' => [
+            ['url' => $continueUrl],
+            ['continueUrl' => $continueUrl],
+        ];
+        yield 'handle_to_can_handle' => [
+            ['handleCodeInApp' => false],
+            ['canHandleCodeInApp' => false],
         ];
     }
 }

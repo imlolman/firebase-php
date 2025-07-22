@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kreait\Firebase\Tests\Unit\Value;
 
+use Iterator;
 use Kreait\Firebase\Exception\InvalidArgumentException;
 use Kreait\Firebase\Value\ClearTextPassword;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -32,24 +33,14 @@ final class ClearTextPasswordTest extends TestCase
         ClearTextPassword::fromString($value);
     }
 
-    /**
-     * @return array<string, array<string>>
-     */
-    public static function validValues(): array
+    public static function validValues(): Iterator
     {
-        return [
-            'long enough' => ['long enough'],
-        ];
+        yield 'long enough' => ['long enough'];
     }
 
-    /**
-     * @return array<string, array<string>>
-     */
-    public static function invalidValues(): array
+    public static function invalidValues(): Iterator
     {
-        return [
-            'empty string' => [''],
-            'less than 6 chars' => ['short'],
-        ];
+        yield 'empty string' => [''];
+        yield 'less than 6 chars' => ['short'];
     }
 }

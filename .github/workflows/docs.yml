@@ -1,4 +1,4 @@
-name: Docs
+name: Check links
 
 on:
   pull_request:
@@ -6,27 +6,38 @@ on:
       - 'docs/**'
       - '.github/workflows/docs.yml'
       - 'CHANGELOG.md'
+      - 'README.md'
+      - 'lychee.toml'
   push:
     branches: ['7.x']
     paths:
       - 'docs/**'
       - '.github/workflows/docs.yml'
       - 'CHANGELOG.md'
+      - 'README.md'
+      - 'lychee.toml'
   release:
     types: [published]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   links:
-    name: Links
+    name: Check Links
     runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Run Lychee
-        uses: lycheeverse/lychee-action@v1
+        uses: lycheeverse/lychee-action@v2
         with:
-          args: "--verbose --no-progress './**/*.md' './**/*.html' './**/*.rst'"
+          args: "--verbose --no-progress './*.md' './docs/*.rst' './src/**/*.php' './tests/**/*.php'"
           output: ${{ runner.temp }}/lychee/out.md
+          format: markdown
+          jobSummary: true
           fail: true

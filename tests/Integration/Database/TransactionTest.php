@@ -72,10 +72,10 @@ final class TransactionTest extends DatabaseTestCase
             $firstSnapshot = $transaction->snapshot($firstRef);
             $secondSnapshot = $transaction->snapshot($secondRef);
 
-            $firstCurrentValue = $firstSnapshot->getValue() ?: 0;
+            $firstCurrentValue = $firstSnapshot->getValue() ?? 0;
             $newFirstValue = ++$firstCurrentValue;
 
-            $secondCurrentValue = $secondSnapshot->getValue() ?: 0;
+            $secondCurrentValue = $secondSnapshot->getValue() ?? 0;
             $newSecondValue = ++$secondCurrentValue;
 
             // Set the value without a transaction
@@ -98,14 +98,16 @@ final class TransactionTest extends DatabaseTestCase
     public function aValueCanBeDeleted(): void
     {
         $ref = $this->ref->getChild(__FUNCTION__);
+        $ref->set('value');
 
-        self::$db->runTransaction(static function (Transaction $transaction) use ($ref): void {
-            $transaction->snapshot($ref);
+        self::$db->runTransaction(function (Transaction $transaction) use ($ref): void {
+            $snapshot = $transaction->snapshot($ref);
 
+            $this->assertSame('value', $snapshot->getValue());
+
+            // This should not throw an exception
             $transaction->remove($ref);
         });
-
-        $this->addToAssertionCount(1);
     }
 
     #[Test]

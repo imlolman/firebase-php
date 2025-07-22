@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kreait\Firebase\Tests\Unit\AppCheck;
 
+use Iterator;
 use Kreait\Firebase\AppCheck\AppCheckTokenOptions;
 use Kreait\Firebase\Exception\AppCheck\InvalidAppCheckTokenOptions;
 use Kreait\Firebase\Tests\UnitTestCase;
@@ -45,27 +46,17 @@ final class AppCheckTokenOptionsTest extends UnitTestCase
         ]);
     }
 
-    /**
-     * @return array<string, array<int, mixed>>
-     */
-    public static function validOptions(): array
+    public static function validOptions(): Iterator
     {
-        return [
-            'null' => [null],
-            'min-boundary' => [1800],
-            'mid-range' => [30240],
-            'max-boundary' => [60480],
-        ];
+        yield 'null' => [null];
+        yield 'min-boundary' => [1800];
+        yield 'mid-range' => [30240];
+        yield 'max-boundary' => [60480];
     }
 
-    /**
-     * @return array<string, array<int, mixed>>
-     */
-    public static function invalidOptions(): array
+    public static function invalidOptions(): Iterator
     {
-        return [
-            'too-small' => [1799],
-            'too-large' => [604801],
-        ];
+        yield 'too-small' => [1799];
+        yield 'too-large' => [604801];
     }
 }

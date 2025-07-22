@@ -29,7 +29,7 @@ final class NotificationTest extends UnitTestCase
         $notification = Notification::create('title', 'body')
             ->withTitle($title = 'My Title')
             ->withBody($body = 'My Body')
-            ->withImageUrl($imageUrl = 'https://domain.example/image.ext')
+            ->withImageUrl($imageUrl = 'https://example.com/image.ext')
         ;
 
         $this->assertSame($title, $notification->title());
@@ -43,22 +43,12 @@ final class NotificationTest extends UnitTestCase
         $notification = Notification::fromArray($array = [
             'title' => $title = 'My Title',
             'body' => $body = 'My Body',
-            'image' => $imageUrl = 'https://domain.example/image.ext',
+            'image' => $imageUrl = 'https://example.com/image.ext',
         ]);
 
         $this->assertSame($title, $notification->title());
         $this->assertSame($body, $notification->body());
         $this->assertSame($imageUrl, $notification->imageUrl());
         $this->assertEqualsCanonicalizing($array, $notification->jsonSerialize());
-    }
-
-    /**
-     * @return array<string, array<int, array<string, mixed>>>
-     */
-    public function invalidDataProvider(): array
-    {
-        return [
-            'empty_title_and_body' => [['title' => null, 'body' => null]],
-        ];
     }
 }

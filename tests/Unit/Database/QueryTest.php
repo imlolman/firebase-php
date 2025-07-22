@@ -21,17 +21,18 @@ use Throwable;
  */
 final class QueryTest extends UnitTestCase
 {
-    protected Uri $uri;
-    protected Reference&MockObject $reference;
-    protected ApiClient&MockObject $apiClient;
-    protected Query $query;
+    private Reference&MockObject $reference;
+
+    private ApiClient&MockObject $apiClient;
+
+    private Query $query;
 
     protected function setUp(): void
     {
-        $this->uri = new Uri('http://domain.example/some/path');
+        $uri = new Uri('https://example.com/some/path');
 
         $reference = $this->createMock(Reference::class);
-        $reference->method('getURI')->willReturn($this->uri);
+        $reference->method('getURI')->willReturn($uri);
 
         $this->reference = $reference;
 
@@ -51,9 +52,9 @@ final class QueryTest extends UnitTestCase
     {
         $this->apiClient->method('get')->with($this->anything())->willReturn('value');
 
-        $this->query->orderByKey()->equalTo(2)->getSnapshot();
+        $snapshot = $this->query->orderByKey()->equalTo(2)->getSnapshot();
 
-        $this->addToAssertionCount(1);
+        $this->assertSame('value', $snapshot->getValue());
     }
 
     #[Test]

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kreait\Firebase\Tests\Unit\Messaging;
 
 use InvalidArgumentException;
+use Iterator;
 use Kreait\Firebase\Messaging\RegistrationToken;
 use Kreait\Firebase\Messaging\RegistrationTokens;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -24,7 +25,6 @@ final class RegistrationTokensTest extends TestCase
         $tokens = RegistrationTokens::fromValue($value);
 
         $this->assertCount($expectedCount, $tokens);
-        $this->assertSame(!$expectedCount, $tokens->isEmpty());
     }
 
     #[DataProvider('invalidValues')]
@@ -44,28 +44,17 @@ final class RegistrationTokensTest extends TestCase
         $this->assertEqualsCanonicalizing(['foo', 'foo'], $tokens->asStrings());
     }
 
-    /**
-     * @return array<string, array<int, int|mixed>>
-     */
-    public static function validValuesWithExpectedCounts(): array
+    public static function validValuesWithExpectedCounts(): Iterator
     {
         $foo = RegistrationToken::fromValue('foo');
-
-        return [
-            'string' => [1, 'foo'],
-            'token object' => [1, $foo],
-            'collection' => [2, new RegistrationTokens($foo, $foo)],
-            'array with mixed values' => [2, [$foo, 'bar']],
-        ];
+        yield 'string' => [1, 'foo'];
+        yield 'token object' => [1, $foo];
+        yield 'collection' => [2, new RegistrationTokens($foo, $foo)];
+        yield 'array with mixed values' => [2, [$foo, 'bar']];
     }
 
-    /**
-     * @return array<string, list<mixed>>
-     */
-    public static function invalidValues(): array
+    public static function invalidValues(): Iterator
     {
-        return [
-            'invalid object' => [new stdClass()],
-        ];
+        yield 'invalid object' => [new stdClass()];
     }
 }

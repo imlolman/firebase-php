@@ -9,7 +9,7 @@ Specifically, you can send messages to individual devices, named topics, or cond
     Sending messages to Device Groups is only possible with legacy protocols which are not supported
     by this SDK.
 
-Before you start, please read about Firebase Remote Config in the official documentation:
+Before you start, please read about Firebase Cloud Messaging in the official documentation:
 
 - `Introduction to Firebase Cloud Messaging <https://firebase.google.com/docs/cloud-messaging/>`_
 - `Introduction to Admin FCM API <https://firebase.google.com/docs/cloud-messaging/admin/>`_
@@ -52,9 +52,13 @@ Getting started
 
     use Kreait\Firebase\Messaging\CloudMessage;
 
-    $message = CloudMessage::withTarget(/* see sections below */)
+    $message = CloudMessage::new()
         ->withNotification(Notification::create('Title', 'Body'))
-        ->withData(['key' => 'value']);
+        ->withData(['key' => 'value'])
+        ->toToken('...')
+        // ->toTopic('...')
+        // ->toCondition('...')
+    ;
 
     $messaging->send($message);
 
@@ -89,13 +93,15 @@ You can create a message to a topic in one of the following ways:
 
 .. code-block:: php
 
+    use Kreait\Firebase\Exception\MessagingException;
     use Kreait\Firebase\Messaging\CloudMessage;
 
     $topic = 'a-topic';
 
-    $message = CloudMessage::withTarget('topic', $topic)
+    $message = CloudMessage::new()
         ->withNotification($notification) // optional
         ->withData($data) // optional
+        ->toTopic($topic)
     ;
 
     $message = CloudMessage::fromArray([
@@ -104,7 +110,12 @@ You can create a message to a topic in one of the following ways:
         'data' => [/* data array */], // optional
     ]);
 
-    $messaging->send($message);
+    try {
+        $result = $messaging->send($message);
+        // $result = ['name' => 'projects/<project-id>/messages/6810356097230477954']
+    } catch (MessagingException $e) {
+        // ...
+    }
 
 
 *************************
@@ -140,9 +151,10 @@ Likewise, a user who does not subscribe to TopicA does not receive the message. 
 
     $condition = "'TopicA' in topics && ('TopicB' in topics || 'TopicC' in topics)";
 
-    $message = CloudMessage::withTarget('condition', $condition)
+    $message = CloudMessage::new()
         ->withNotification($notification) // optional
         ->withData($data) // optional
+        ->toCondition($condition)
     ;
 
     $message = CloudMessage::fromArray([
@@ -174,9 +186,10 @@ and `Unity <https://firebase.google.com/docs/cloud-messaging/unity/client#initia
 
     $deviceToken = '...';
 
-    $message = CloudMessage::withTarget('token', $deviceToken)
+    $message = CloudMessage::new()
         ->withNotification($notification) // optional
         ->withData($data) // optional
+        ->toToken($deviceToken)
     ;
 
     $message = CloudMessage::fromArray([
@@ -185,11 +198,12 @@ and `Unity <https://firebase.google.com/docs/cloud-messaging/unity/client#initia
         'data' => [/* data array */], // optional
     ]);
 
-    $messaging->send($message);
+    $result = $messaging->send($message);
+    // $result = ['name' => 'projects/<project-id>/messages/<message-id>']
 
-*********************************************
-Send messages to multiple devices (Multicast)
-*********************************************
+************************
+Send messages in batches
+************************
 
 .. note::
     If you need to send a message to more than a few devices, consider sending the message
@@ -199,13 +213,27 @@ Send messages to multiple devices (Multicast)
 
     use Kreait\Firebase\Messaging\CloudMessage;
 
-    $deviceTokens = ['...', '...' /* ... */];
+    $messages = [
+        // Either objects implementing Kreait\Firebase\Messaging\Message or arrays that can
+        // be parsed into to Kreait\Firebase\Messaging\CloudMessage objects
+    ];
+
+    /** @var Kreait\Firebase\Messaging\MulticastSendReport $sendReport **/
+    $sendReport = $messaging->sendAll($messages);
+
+The ``sendMulticast()`` message is a convenience method to send one message to multiple devices.
+
+.. code-block:: php
+
+    use Kreait\Firebase\Messaging\CloudMessage;
 
     $message = CloudMessage::new(); // Any instance of Kreait\Messaging\Message
+    $deviceTokens = ['...', '...' /* ... */];
 
+    /** @var Kreait\Firebase\Messaging\MulticastSendReport $sendReport **/
     $sendReport = $messaging->sendMulticast($message, $deviceTokens);
 
-The returned value is an instance of ``Kreait\Firebase\Messaging\MulticastSendReport`` and provides you with
+The returned value ``$sendReport`` is an instance of ``Kreait\Firebase\Messaging\MulticastSendReport`` and provides you with
 methods to determine the successes and failures of the multicasted message:
 
 .. code-block:: php
@@ -233,28 +261,10 @@ methods to determine the successes and failures of the multicasted message:
     // Invalid (=malformed) tokens
     $invalidTargets = $report->invalidTokens(); // string[]
 
-
-******************************
-Send multiple messages at once
-******************************
-
 .. note::
-    If you need to send a message to more than a few devices, consider sending the message
-    to a topic instead.
-
-.. code-block:: php
-
-    use Kreait\Firebase\Messaging\CloudMessage;
-
-    $messages = [
-        // Either objects implementing Kreait\Firebase\Messaging\Message
-        // or arrays that can be used to create valid to Kreait\Firebase\Messaging\CloudMessage instances
-    ];
-
-    $message = CloudMessage::new(); // Any instance of Kreait\Messaging\Message
-
-    /** @var Kreait\Firebase\Messaging\MulticastSendReport $sendReport **/
-    $sendReport = $messaging->sendAll($messages);
+    The ``sendMulticast`` method stems from a time where Firebase had a (now shutdown) dedicated API endpoint
+    for multicast messages. It is now a wrapper for the ``sendAll()`` method. "Legacy" is also the reason why
+    the returned report is named ``MulticastSendReport``.
 
 *********************
 Adding a notification
@@ -310,28 +320,6 @@ you can attach data to it:
     ];
 
     $message = $message->withData($data);
-
-***************************
-Changing the message target
-***************************
-
-You can change the target of an already created message with the ``withChangedTarget()`` method.
-
-.. code-block:: php
-
-    use Kreait\Firebase\Messaging\CloudMessage;
-
-    $deviceToken = '...';
-    $anotherDeviceToken = '...';
-
-    $message = CloudMessage::withTarget('token', $deviceToken)
-        ->withNotification(['title' => 'My title', 'body' => 'My Body'])
-    ;
-
-    $messaging->send($message);
-
-    $sameMessageToDifferentTarget = $message->withChangedTarget('token', $anotherDeviceToken);
-
 
 *********************************************
 Adding target platform specific configuration
@@ -455,7 +443,7 @@ The SDK provides helper methods to add sounds to messages:
 
 .. code-block:: php
 
-    $message = CloudMessage::withTarget('token', $token)
+    $message = CloudMessage::new()
         ->withNotification(['title' => 'Notification title', 'body' => 'Notification body'])
         ->withDefaultSounds() // Enables default notifications sounds on iOS and Android devices.
         ->withApnsConfig(
@@ -513,7 +501,7 @@ Example
 
 .. code-block:: php
 
-    $message = CloudMessage::withTarget('token', $token)
+    $message = CloudMessage::new()
         ->withNotification([
             'title' => 'If you had an iOS device…',
             'body' => '… you would have received a very important message'
@@ -637,7 +625,7 @@ Validating Registration Tokens
 ******************************
 
 If you have a set of registration tokens that you want to check for validity or if they are still registered
-to your project, you can use the ``validateTokens()`` method:
+to your project, you can use the ``validateRegistrationTokens()`` method:
 
 .. code-block:: php
 
@@ -771,7 +759,7 @@ has an ``errors()`` method that provides additional information about the error.
 
     try {
         $messaging->send($message);
-    catch (MessagingException $e) {
+    } catch (MessagingException $e) {
         echo $e->getMessage();
         print_r($e->errors());
     }
@@ -790,7 +778,7 @@ example when you forget to add a message target.
 
     try {
         $messaging->send($message);
-    catch (InvalidMessage $e) {
+    } catch (InvalidMessage $e) {
         echo $e->getMessage();
         print_r($e->errors());
     }
@@ -815,11 +803,11 @@ syntactically correct, this usually has one of the following reasons:
 
     try {
         $messaging->send($message);
-    catch (NotFound $e) {
+    } catch (NotFound $e) {
         echo $e->getMessage();
         print_r($e->errors());
         // If the message was send to a token, you can retrieve the unknown token
-        $echo $e->token();
+        echo $e->token();
     }
 
 Quota exceeded
@@ -834,7 +822,7 @@ in a short period of time, FCM servers will respond with a 429 RESOURCE_EXHAUSTE
 
     try {
         $messaging->subscribeToTopic($topic, $registrationTokenOrTokens);
-    catch (QuotaExceeded $e) {
+    } catch (QuotaExceeded $e) {
         echo $e->getMessage();
         print_r($e->errors());
         $retryAfter= $e->retryAfter();
@@ -858,7 +846,7 @@ request.
 
     try {
         $messaging->send($message);
-    catch (ServerUnavailable $e) {
+    } catch (ServerUnavailable $e) {
         echo 'The FCM servers are currently unavailable: '.$e->getMessage();
         print_r($e->errors());
         $retryAfter= $e->retryAfter();

@@ -4,104 +4,102 @@ declare(strict_types=1);
 
 namespace Kreait\Firebase\Tests\Integration;
 
-use Beste\Json;
+use InvalidArgumentException;
 use Kreait\Firebase\Factory;
+use Kreait\Firebase\ServiceAccount;
+use Kreait\Firebase\Tests\IntegrationTestCase;
 use Kreait\Firebase\Util;
+use Kreait\Firebase\Valinor\Mapper;
+use Kreait\Firebase\Valinor\Normalizer;
+use Kreait\Firebase\Valinor\Source;
+use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\TestCase;
-
-use function assert;
 
 /**
  * @internal
  */
-final class ServiceAccountTest extends TestCase
+final class ServiceAccountTest extends IntegrationTestCase
 {
-    /**
-     * @var non-empty-string
-     */
-    private static string $credentialsPath;
-    private static bool $credentialsPathIsTemporary = false;
+    private ServiceAccount $serviceAccount;
 
-    public static function setUpBeforeClass(): void
+    private Normalizer $normalizer;
+
+    protected function setUp(): void
     {
-        $credentialsFromEnvironment = Util::getenv('GOOGLE_APPLICATION_CREDENTIALS');
+        parent::setUp();
 
-        if ($credentialsFromEnvironment !== null && str_starts_with($credentialsFromEnvironment, '{')) {
-            // Don't overwrite the fixtures file
-            $credentialsPath = __DIR__.'/test_credentials.json';
-            self::$credentialsPathIsTemporary = true;
+        $this->serviceAccount = (new Mapper())
+            ->snakeToCamelCase()
+            ->allowSuperfluousKeys()
+            ->map(ServiceAccount::class, Source::parse(self::$credentials));
 
-            $result = file_put_contents($credentialsPath, $credentialsFromEnvironment);
-
-            if ($result === false) {
-                self::fail("Unable to write credentials to file `{$credentialsPath}`");
-            }
-
-            Util::putenv('GOOGLE_APPLICATION_CREDENTIALS', $credentialsPath);
-        } elseif (!file_exists($credentialsPath = __DIR__.'/../_fixtures/test_credentials.json')) {
-            self::markTestSkipped('The integration tests require credentials');
-        }
-
-        self::$credentialsPath = $credentialsPath;
-    }
-
-    public static function tearDownAfterClass(): void
-    {
-        if (self::$credentialsPathIsTemporary) {
-            unlink(self::$credentialsPath);
-        }
+        $this->normalizer = (new Normalizer())->camelToSnakeCase();
     }
 
     #[Test]
+    #[DoesNotPerformAssertions]
     public function withPathToServiceAccount(): void
     {
-        $factory = (new Factory())->withServiceAccount(self::$credentialsPath);
+        $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.__FUNCTION__.'.json';
+        file_put_contents($path, $this->normalizer->toJson($this->serviceAccount));
 
-        $this->assertFunctioningConnection($factory);
+        try {
+            $factory = (new Factory())->withServiceAccount($path);
+            $this->assertFunctioningConnection($factory);
+        } finally {
+            unlink($path);
+        }
     }
 
     #[Test]
+    #[DoesNotPerformAssertions]
     public function withJsonString(): void
     {
-        $json = file_get_contents(self::$credentialsPath);
-        assert($json !== false && $json !== '');
-
-        $factory = (new Factory())->withServiceAccount($json);
+        $factory = (new Factory())->withServiceAccount($this->normalizer->toJson($this->serviceAccount));
 
         $this->assertFunctioningConnection($factory);
     }
 
     #[Test]
+    #[DoesNotPerformAssertions]
     public function withArray(): void
     {
-        $json = file_get_contents(self::$credentialsPath);
-        assert($json !== false && $json !== '');
-
-        $array = Json::decode($json, true);
-
-        $factory = (new Factory())->withServiceAccount($array);
+        $factory = (new Factory())->withServiceAccount($this->normalizer->toArray($this->serviceAccount));
 
         $this->assertFunctioningConnection($factory);
     }
 
     #[Test]
+    #[DoesNotPerformAssertions]
     public function withGoogleApplicationCredentialsAsFilePath(): void
     {
-        Util::putenv('GOOGLE_APPLICATION_CREDENTIALS', self::$credentialsPath);
+        $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.__FUNCTION__.'.json';
+        file_put_contents($path, $this->normalizer->toJson($this->serviceAccount));
+
+        Util::putenv('GOOGLE_APPLICATION_CREDENTIALS', $path);
+
+        try {
+            $this->assertFunctioningConnection(new Factory());
+        } finally {
+            unlink($path);
+        }
+    }
+
+    #[Test]
+    #[DoesNotPerformAssertions]
+    public function withGoogleApplicationCredentialsAsJsonString(): void
+    {
+        Util::putenv('GOOGLE_APPLICATION_CREDENTIALS', $this->normalizer->toJson($this->serviceAccount));
 
         $this->assertFunctioningConnection(new Factory());
     }
 
     #[Test]
-    public function withGoogleApplicationCredentialsAsJsonString(): void
+    public function withInvalidServiceAccount(): void
     {
-        $json = file_get_contents(self::$credentialsPath);
-        assert($json !== false && $json !== '');
+        $this->expectException(InvalidArgumentException::class);
 
-        Util::putenv('GOOGLE_APPLICATION_CREDENTIALS', $json);
-
-        $this->assertFunctioningConnection(new Factory());
+        (new Factory())->withServiceAccount(['invalid' => 'data']);
     }
 
     private function assertFunctioningConnection(Factory $factory): void
@@ -111,7 +109,6 @@ final class ServiceAccountTest extends TestCase
 
         try {
             $user = $auth->createAnonymousUser();
-            $this->addToAssertionCount(1);
         } finally {
             if ($user !== null) {
                 $auth->deleteUser($user->uid);

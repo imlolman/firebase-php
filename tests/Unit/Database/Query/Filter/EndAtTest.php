@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kreait\Firebase\Tests\Unit\Database\Query\Filter;
 
 use GuzzleHttp\Psr7\Uri;
+use Iterator;
 use Kreait\Firebase\Database\Query\Filter\EndAt;
 use Kreait\Firebase\Tests\UnitTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -21,17 +22,12 @@ final class EndAtTest extends UnitTestCase
     {
         $filter = new EndAt($given);
 
-        $this->assertStringContainsString($expected, (string) $filter->modifyUri(new Uri('http://domain.example')));
+        $this->assertStringContainsString($expected, (string) $filter->modifyUri(new Uri('https://example.com')));
     }
 
-    /**
-     * @return array<string, array<int, int|string>>
-     */
-    public static function valueProvider(): array
+    public static function valueProvider(): Iterator
     {
-        return [
-            'int' => [1, 'endAt=1'],
-            'string' => ['value', 'endAt=%22value%22'],
-        ];
+        yield 'int' => [1, 'endAt=1'];
+        yield 'string' => ['value', 'endAt=%22value%22'];
     }
 }

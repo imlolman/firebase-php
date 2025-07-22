@@ -17,12 +17,13 @@ use Psr\Http\Message\RequestInterface;
 final class MiddlewareTest extends UnitTestCase
 {
     private Request $request;
+
     private Closure $handler;
 
     protected function setUp(): void
     {
-        $this->request = new Request('GET', 'http://domain.example');
-        $this->handler = static fn(RequestInterface $request) => $request;
+        $this->request = new Request('GET', 'https://example.com');
+        $this->handler = static fn(RequestInterface $request): RequestInterface => $request;
     }
 
     #[Test]

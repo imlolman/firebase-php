@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Kreait\Firebase\Tests\Unit\Messaging;
 
 use Beste\Json;
+use Iterator;
 use Kreait\Firebase\Exception\Messaging\InvalidArgument;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\FcmOptions;
 use Kreait\Firebase\Messaging\MessageData;
 use Kreait\Firebase\Messaging\MessageTarget;
-use Kreait\Firebase\Messaging\Notification;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -27,27 +27,14 @@ final class CloudMessageTest extends TestCase
     }
 
     #[Test]
-    public function withChangedTarget(): void
+    public function anEmptyMessageHasNoTarget(): void
     {
-        $original = CloudMessage::withTarget(MessageTarget::TOKEN, 'bar')
-            ->withData(['foo' => 'bar'])
-            ->withNotification(Notification::create('title', 'body'))
-        ;
+        $message = CloudMessage::new();
+        $payload = Json::decode(Json::encode($message), true);
 
-        $changed = $original->withChangedTarget(MessageTarget::TOKEN, 'baz');
-
-        $encodedOriginal = Json::decode(Json::encode($original), true);
-        $encodedOriginal[MessageTarget::TOKEN] = 'baz';
-
-        $encodedChanged = Json::decode(Json::encode($changed), true);
-
-        $this->assertSame($encodedOriginal, $encodedChanged);
-    }
-
-    #[Test]
-    public function anEmptyMessageHasNotTarget(): void
-    {
-        $this->assertFalse(CloudMessage::new()->hasTarget());
+        $this->assertArrayNotHasKey('token', $payload);
+        $this->assertArrayNotHasKey('condition', $payload);
+        $this->assertArrayNotHasKey('topic', $payload);
     }
 
     #[Test]
@@ -161,29 +148,24 @@ final class CloudMessageTest extends TestCase
         $this->assertSame($serializedFromObject, $serializedFromArray);
     }
 
-    /**
-     * @return array<string, array<int, array<string, string>>>
-     */
-    public static function multipleTargets(): array
+    public static function multipleTargets(): Iterator
     {
-        return [
-            'condition and token' => [[
-                MessageTarget::CONDITION => 'something',
-                MessageTarget::TOKEN => 'something else',
-            ]],
-            'condition and topic' => [[
-                MessageTarget::CONDITION => 'something',
-                MessageTarget::TOPIC => 'something else',
-            ]],
-            'token and topic' => [[
-                MessageTarget::TOKEN => 'something',
-                MessageTarget::TOPIC => 'something else',
-            ]],
-            'all of them' => [[
-                MessageTarget::CONDITION => 'something',
-                MessageTarget::TOKEN => 'something else',
-                MessageTarget::TOPIC => 'something different',
-            ]],
-        ];
+        yield 'condition and token' => [[
+            MessageTarget::CONDITION => 'something',
+            MessageTarget::TOKEN => 'something else',
+        ]];
+        yield 'condition and topic' => [[
+            MessageTarget::CONDITION => 'something',
+            MessageTarget::TOPIC => 'something else',
+        ]];
+        yield 'token and topic' => [[
+            MessageTarget::TOKEN => 'something',
+            MessageTarget::TOPIC => 'something else',
+        ]];
+        yield 'all of them' => [[
+            MessageTarget::CONDITION => 'something',
+            MessageTarget::TOKEN => 'something else',
+            MessageTarget::TOPIC => 'something different',
+        ]];
     }
 }

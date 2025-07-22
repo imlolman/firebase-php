@@ -43,16 +43,18 @@ final class ApiClient
             ]),
         ]);
 
-        return Json::decode((string) $response->getBody(), true);
+        /** @var AppCheckTokenShape $decoded */
+        $decoded = Json::decode((string) $response->getBody(), true);
+
+        return $decoded;
     }
 
     /**
-     * @param string|UriInterface $uri
+     * @param non-empty-string $method
      * @param array<string, mixed>|null $options
-     *
      * @throws AppCheckException
      */
-    private function requestApi(string $method, $uri, ?array $options = null): ResponseInterface
+    private function requestApi(string $method, string|UriInterface $uri, ?array $options = null): ResponseInterface
     {
         $options ??= [];
 

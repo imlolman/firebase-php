@@ -18,6 +18,7 @@ use Kreait\Firebase\RemoteConfig\UpdateType;
 use Kreait\Firebase\RemoteConfig\Version;
 use Kreait\Firebase\RemoteConfig\VersionNumber;
 use Kreait\Firebase\Tests\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
 use PHPUnit\Framework\Attributes\Test;
 use Throwable;
 
@@ -41,6 +42,11 @@ final class RemoteConfigTest extends IntegrationTestCase
                     "name": "lang_french",
                     "expression": "device.language in ['fr', 'fr_CA', 'fr_CH']",
                     "tagColor": "GREEN"
+                },
+                {
+                    "name": "user_exists",
+                    "expression": "true",
+                    "tagColor": "TEAL"
                 }
             ],
             "parameters": {
@@ -63,7 +69,7 @@ final class RemoteConfigTest extends IntegrationTestCase
                 },
                 "unspecified_value_type": {
                     "defaultValue": "1",
-                    "valueType": "STRING"
+                    "valueType": "PARAMETER_VALUE_TYPE_UNSPECIFIED"
                 },
                 "string_value_type": {
                     "defaultValue": "1",
@@ -80,6 +86,20 @@ final class RemoteConfigTest extends IntegrationTestCase
                 "json_value_type": {
                     "defaultValue": "{\"key\": \"value\"}",
                     "valueType": "JSON"
+                },
+                "is_ready_for_rollout": {
+                    "defaultValue": "false",
+                    "valueType": "BOOLEAN",
+                    "conditionalValues": {
+                        "lang_german": {
+                            "value": "false"
+                        },
+                        "user_exists": {
+                            "rollout_id": "rollout_2",
+                            "value": "true",
+                            "percent": 50
+                        }
+                    }
                 }
             },
             "parameterGroups": {
@@ -119,7 +139,9 @@ final class RemoteConfigTest extends IntegrationTestCase
             }
         }
         CONFIG;
+
     private Template $template;
+
     private RemoteConfig $remoteConfig;
 
     protected function setUp(): void
@@ -154,6 +176,42 @@ final class RemoteConfigTest extends IntegrationTestCase
     }
 
     #[Test]
+    public function getTemplateWithVersion(): void
+    {
+        $template = $this->remoteConfig->get();
+        $version = $template->version();
+        assert($version !== null);
+
+        $check = $this->remoteConfig->get($version);
+
+        $this->assertTrue($version->versionNumber()->equalsTo($check->version()?->versionNumber()));
+    }
+
+    #[Test]
+    public function getTemplateWithVersionNumber(): void
+    {
+        $template = $this->remoteConfig->get();
+        $version = $template->version();
+        assert($version !== null);
+
+        $check = $this->remoteConfig->get($version->versionNumber());
+
+        $this->assertTrue($version->versionNumber()->equalsTo($check->version()?->versionNumber()));
+    }
+
+    #[Test]
+    public function getTemplateWithVersionNumberString(): void
+    {
+        $template = $this->remoteConfig->get();
+        $version = $template->version();
+        assert($version !== null);
+
+        $check = $this->remoteConfig->get((string) $version->versionNumber());
+
+        $this->assertTrue($version->versionNumber()->equalsTo($check->version()?->versionNumber()));
+    }
+
+    #[Test]
     public function publishOutdatedConfig(): void
     {
         $this->remoteConfig->publish($this->template);
@@ -168,11 +226,12 @@ final class RemoteConfigTest extends IntegrationTestCase
         $this->remoteConfig->publish($published);
     }
 
+    #[DoesNotPerformAssertions]
     #[Test]
     public function validateValidTemplate(): void
     {
+        // This should not throw an exception
         $this->remoteConfig->validate($this->template);
-        $this->addToAssertionCount(1);
     }
 
     #[Test]
@@ -268,16 +327,15 @@ final class RemoteConfigTest extends IntegrationTestCase
     #[Test]
     public function listVersionsWithoutFilters(): void
     {
+        $count = 0;
         // We only need to know that the first returned value is a version,
         // no need to iterate through all of them
         foreach ($this->remoteConfig->listVersions() as $version) {
-            // @phpstan-ignore-next-line
-            $this->assertInstanceOf(Version::class, $version);
-
-            return;
+            ++$count;
+            break;
         }
 
-        $this->fail('Expected a version to be returned, but got none');
+        $this->assertSame(1, $count);
     }
 
     #[Test]
@@ -338,17 +396,24 @@ final class RemoteConfigTest extends IntegrationTestCase
             $this->fail('The template has no version');
         }
 
-        $nextButNonExisting = (int) (string) $currentVersion->versionNumber() + 100;
+        $version = $currentVersion->versionNumber();
+        $versionString = $version->__toString();
+        $versionNumber = (int) $versionString;
+
+        $this->assertGreaterThan(0, $versionNumber);
+
+        $nextButNonExisting = $versionNumber + 100;
 
         $this->expectException(VersionNotFound::class);
         $this->remoteConfig->getVersion($nextButNonExisting);
     }
 
+    #[DoesNotPerformAssertions]
     #[Test]
     public function validateEmptyTemplate(): void
     {
+        // This should not throw an exception
         $this->remoteConfig->validate(Template::new());
-        $this->addToAssertionCount(1);
     }
 
     private function templateWithTooManyParameters(): Template

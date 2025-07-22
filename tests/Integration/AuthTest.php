@@ -12,8 +12,4 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('emulator')]
 final class AuthTest extends AuthTestCase
 {
-    protected function setUp(): void
-    {
-        $this->auth = self::$factory->createAuth();
-    }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kreait\Firebase\Tests\Unit\Database\Reference;
 
 use GuzzleHttp\Psr7\Uri;
+use Iterator;
 use Kreait\Firebase\Database\Reference\Validator;
 use Kreait\Firebase\Exception\InvalidArgumentException;
 use Kreait\Firebase\Tests\UnitTestCase;
@@ -21,13 +22,14 @@ use function str_pad;
 final class ValidatorTest extends UnitTestCase
 {
     private UriInterface $uri;
+
     private Validator $validator;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->uri = new Uri('http://domain.example');
+        $this->uri = new Uri('https://example.com');
         $this->validator = new Validator();
     }
 
@@ -59,17 +61,12 @@ final class ValidatorTest extends UnitTestCase
         $this->validator->validateUri($uri);
     }
 
-    /**
-     * @return array<string, array<int, string>>
-     */
-    public static function invalidChars(): array
+    public static function invalidChars(): Iterator
     {
-        return [
-            '.' => ['.'],
-            '$' => ['$'],
-            '#' => ['#'],
-            '[' => ['['],
-            ']' => [']'],
-        ];
+        yield '.' => ['.'];
+        yield '$' => ['$'];
+        yield '#' => ['#'];
+        yield '[' => ['['];
+        yield ']' => [']'];
     }
 }

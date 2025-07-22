@@ -3,6 +3,7 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
     beStrictAboutOutputDuringTests="true"
+    bootstrap="tests/bootstrap.php"
     colors="true"
 >
     <testsuites>
@@ -17,9 +18,18 @@
 
     <coverage ignoreDeprecatedCodeUnits="true"/>
 
-    <source>
+    <source restrictDeprecations="true">
         <include>
             <directory>src/Firebase</directory>
         </include>
+
+        <exclude>
+            <!-- The Dynamic Links Component ist deprecated and the tests are brittle -->
+            <directory>src/Firebase/DynamicLink</directory>
+        </exclude>
     </source>
+
+    <php>
+        <ini name="date.timezone" value="UTC" />
+    </php>
 </phpunit>

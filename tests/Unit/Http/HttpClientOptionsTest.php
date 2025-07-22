@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Kreait\Firebase\Tests\Unit\Http;
 
+use GuzzleHttp\Promise\PromiseInterface;
 use InvalidArgumentException;
 use Kreait\Firebase\Http\HttpClientOptions;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\RequestInterface;
 
 /**
  * @internal
@@ -21,13 +23,13 @@ final class HttpClientOptionsTest extends TestCase
             ->withConnectTimeout(1.1)
             ->withReadTimeout(2.2)
             ->withTimeout(3.3)
-            ->withProxy('https://proxy.tld')
+            ->withProxy('https://proxy.example.com')
         ;
 
-        $this->assertSame(1.1, $options->connectTimeout());
-        $this->assertSame(2.2, $options->readTimeout());
-        $this->assertSame(3.3, $options->timeout());
-        $this->assertSame('https://proxy.tld', $options->proxy());
+        $this->assertEqualsWithDelta(1.1, $options->connectTimeout(), PHP_FLOAT_EPSILON);
+        $this->assertEqualsWithDelta(2.2, $options->readTimeout(), PHP_FLOAT_EPSILON);
+        $this->assertEqualsWithDelta(3.3, $options->timeout(), PHP_FLOAT_EPSILON);
+        $this->assertSame('https://proxy.example.com', $options->proxy());
     }
 
     #[Test]
@@ -96,7 +98,7 @@ final class HttpClientOptionsTest extends TestCase
     #[Test]
     public function itAcceptsSingleCallableMiddlewares(): void
     {
-        $options = HttpClientOptions::default()->withGuzzleMiddleware(static fn() => 'Foo', 'name');
+        $options = HttpClientOptions::default()->withGuzzleMiddleware(static fn(): string => 'Foo', 'name');
 
         $middlewares = $options->guzzleMiddlewares();
 
@@ -108,21 +110,44 @@ final class HttpClientOptionsTest extends TestCase
     #[Test]
     public function itAcceptsMultipleMiddlewares(): void
     {
+        $middlewareClass = new class {
+            public static function handle(): void
+            {
+                // This is just a placeholder to demonstrate a callable middleware
+            }
+        };
         $options = HttpClientOptions::default()
             ->withGuzzleMiddlewares([
-                static fn() => 'Foo',
-                ['middleware' => static fn() => 'Foo', 'name' => 'Foo'],
+                static fn(): string => 'Foo',
+                ['middleware' => static fn(): string => 'Foo', 'name' => 'Foo'],
+                ['middleware' => [$middlewareClass::class, 'handle'], 'name' => 'Bar'],
             ])
         ;
 
         $middlewares = $options->guzzleMiddlewares();
 
-        $this->assertCount(2, $middlewares);
+        $this->assertCount(3, $middlewares);
 
         $this->assertIsCallable($middlewares[0]['middleware']);
         $this->assertSame('', $middlewares[0]['name']);
 
         $this->assertIsCallable($middlewares[1]['middleware']);
         $this->assertSame('Foo', $middlewares[1]['name']);
+
+        $this->assertIsCallable($middlewares[2]['middleware']);
+        $this->assertSame('Bar', $middlewares[2]['name']);
+    }
+
+    #[Test]
+    public function itAcceptsACustomHandler(): void
+    {
+        $handler = fn(RequestInterface $request, array $options): PromiseInterface => $this->createMock(PromiseInterface::class);
+
+        $options = HttpClientOptions::default()->withGuzzleHandler($handler);
+
+        $config = $options->guzzleConfig();
+
+        $this->assertArrayHasKey('handler', $config);
+        $this->assertSame($handler, $config['handler']);
     }
 }

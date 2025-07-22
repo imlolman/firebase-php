@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Kreait\Firebase\Tests\Integration\Database;
 
-use DateTimeImmutable;
+use Iterator;
 use Kreait\Firebase\Contract\Database;
 use Kreait\Firebase\Database\Reference;
 use Kreait\Firebase\Tests\Integration\DatabaseTestCase;
@@ -141,8 +141,6 @@ final class ReferenceTest extends DatabaseTestCase
     #[Test]
     public function setServerTimestamp(): void
     {
-        $now = new DateTimeImmutable();
-
         $value = $this->ref->getChild(__FUNCTION__)
             ->push(['updatedAt' => Database::SERVER_TIMESTAMP])
             ->getSnapshot()->getValue()
@@ -153,17 +151,12 @@ final class ReferenceTest extends DatabaseTestCase
         $this->assertIsInt($value['updatedAt']);
     }
 
-    /**
-     * @return array<string, array<int, mixed>>
-     */
-    public static function validValues()
+    public static function validValues(): Iterator
     {
-        return [
-            'string' => ['string', 'value'],
-            'int' => ['int', 1],
-            'bool_true' => ['true', true],
-            'bool_false' => ['false', false],
-            'array' => ['array', ['first' => 'value', 'second' => 'value']],
-        ];
+        yield 'string' => ['string', 'value'];
+        yield 'int' => ['int', 1];
+        yield 'bool_true' => ['true', true];
+        yield 'bool_false' => ['false', false];
+        yield 'array' => ['array', ['first' => 'value', 'second' => 'value']];
     }
 }

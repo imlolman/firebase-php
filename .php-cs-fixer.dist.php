@@ -5,14 +5,19 @@ declare(strict_types=1);
 $finder = PhpCsFixer\Finder::create()->in(__DIR__);
 
 return (new PhpCsFixer\Config())
+    ->setParallelConfig(PhpCsFixer\Runner\Parallel\ParallelConfigFactory::detect())
     ->setRiskyAllowed(true)
     ->setRules([
         '@PER-CS2.0' => true,
+        'class_attributes_separation' => true,
         'class_definition' => [
             'single_line' => true,
         ],
         'concat_space' => [
             'spacing' => 'none',
+        ],
+        'method_argument_space' => [
+            'attribute_placement' => 'same_line',
         ],
         'no_unused_imports' => true,
         'ordered_imports' => [

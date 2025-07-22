@@ -8,6 +8,7 @@ use Beste\Clock\SystemClock;
 use Firebase\JWT\JWT;
 use Kreait\Firebase\Exception\AppCheck\InvalidAppCheckTokenOptions;
 use Psr\Clock\ClockInterface;
+use SensitiveParameter;
 
 /**
  * @internal
@@ -15,6 +16,7 @@ use Psr\Clock\ClockInterface;
 final class AppCheckTokenGenerator
 {
     private const APP_CHECK_AUDIENCE = 'https://firebaseappcheck.googleapis.com/google.firebase.appcheck.v1.TokenExchangeService';
+
     private readonly ClockInterface $clock;
 
     /**
@@ -23,7 +25,7 @@ final class AppCheckTokenGenerator
      */
     public function __construct(
         private readonly string $clientEmail,
-        private readonly string $privateKey,
+        #[SensitiveParameter] private readonly string $privateKey,
         ?ClockInterface $clock = null,
     ) {
         $this->clock = $clock ?? SystemClock::create();
@@ -48,7 +50,7 @@ final class AppCheckTokenGenerator
             'exp' => $now + 300,
         ];
 
-        if (null !== $options && $options->ttl) {
+        if ($options?->ttl !== null) {
             $payload['ttl'] = $options->ttl.'s';
         }
 

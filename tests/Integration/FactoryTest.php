@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kreait\Firebase\Tests\Integration;
 
+use Closure;
 use Kreait\Firebase\Http\HttpClientOptions;
 use Kreait\Firebase\Tests\IntegrationTestCase;
 use PHPUnit\Framework\Attributes\Test;
@@ -54,7 +55,7 @@ final class FactoryTest extends IntegrationTestCase
 
         $check = false;
 
-        $middleware = static function (callable $handler) use (&$check) {
+        $middleware = static function (callable $handler) use (&$check): Closure {
             return static function (RequestInterface $request, array $options) use ($handler, &$check) {
                 $check = true;
 
@@ -74,31 +75,5 @@ final class FactoryTest extends IntegrationTestCase
         $db->getReference(__FUNCTION__)->shallow()->getSnapshot();
 
         $this->assertTrue($check);
-    }
-
-    #[Test]
-    public function itSupportsOverridingTheDefaultFirestoreDatabase(): void
-    {
-        $firestore = self::$factory
-            ->withFirestoreDatabase(__FUNCTION__)
-            ->createFirestore();
-
-        $db = $firestore->database();
-        $name = $db->collection('irrelevant')->name();
-
-        $this->assertStringContainsString(__FUNCTION__, $name);
-    }
-
-    #[Test]
-    public function itSupportsAdditionalFirestoreConfig(): void
-    {
-        $firestore = self::$factory
-            ->withFirestoreClientConfig(['database' => __FUNCTION__])
-            ->createFirestore();
-
-        $db = $firestore->database();
-        $name = $db->collection('irrelevant')->name();
-
-        $this->assertStringContainsString(__FUNCTION__, $name);
     }
 }

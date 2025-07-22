@@ -18,7 +18,7 @@ following signature:
 
     {
         "uid": "jEazVdPDhqec0tnEOG7vM5wbDyU2",
-        "email": "user@domain.example",
+        "email": "user@example.com",
         "emailVerified": true,
         "displayName": null,
         "photoUrl": null,
@@ -32,10 +32,10 @@ following signature:
         },
         "providerData": [
             {
-                "uid": "user@domain.example",
+                "uid": "user@example.com",
                 "displayName": null,
                 "screenName": null,
-                "email": "user@domain.example",
+                "email": "user@example.com",
                 "photoUrl": null,
                 "providerId": "password",
                 "phoneNumber": null
@@ -142,10 +142,53 @@ Get information about a specific user
 
     try {
         $user = $auth->getUser('some-uid');
-        $user = $auth->getUserByEmail('user@domain.example');
+        $user = $auth->getUserByEmail('user@example.com');
         $user = $auth->getUserByPhoneNumber('+49-123-456789');
+        // For `getUserByProviderUid()` please see the section below.
+        $user = $auth->getUserByProviderUid('google.com', 'google-uid');
     } catch (\Kreait\Firebase\Exception\Auth\UserNotFound $e) {
         echo $e->getMessage();
+    }
+
+***************************************************
+Get information about a user by federated provider
+***************************************************
+
+You can retrieve a user by their federated identity provider UID (e.g. Google, Facebook, etc.):
+
+.. code-block:: php
+
+    try {
+        $googleUser = $auth->getUserByProviderUid('google.com', 'google-uid');
+        $facebookUser = $auth->getUserByProviderUid('facebook.com', 'facebook-uid');
+    } catch (\Kreait\Firebase\Exception\Auth\UserNotFound $e) {
+        echo $e->getMessage();
+    }
+
+.. note::
+    Since this method couldn't be added to the ``Kreait\Firebase\Contract\Auth`` interface without causing a breaking
+    change, a new transitional interface/contract named ``Kreait\Firebase\Contract\Transitional\FederatedUserFetcher``
+    was added. This interface will be removed in the next major version of the SDK.
+
+There are several ways to check if you can use the ``getUserByProviderUid()`` method:
+
+.. code-block:: php
+
+    use Kreait\Firebase\Contract\Transitional\FederatedUserFetcher;
+    use Kreait\Firebase\Factory;
+
+    $auth = (new Factory())->createAuth();
+
+    if (method_exists($auth, 'getUserByProviderUid')) {
+        $user = $auth->getUserByProviderUid('google.com', 'google-uid');
+    }
+
+    if ($auth instanceof \Kreait\Firebase\Auth) { // This is the implementation, not the interface
+        $user = $auth->getUserByProviderUid('google.com', 'google-uid');
+    }
+
+    if ($auth instanceof FederatedUserFetcher) {
+        $user = $auth->getUserByProviderUid('google.com', 'google-uid');
     }
 
 ************************************
@@ -269,6 +312,8 @@ Property               Type         Description
 ``deletePhotoUrl``     boolean      Whether or not to delete the user's photo.
 ``deleteDisplayName``  boolean      Whether or not to delete the user's display name.
 ``deletePhoneNumber``  boolean      Whether or not to delete the user's phone number.
+``resetMultiFactor``   boolean      Whether or not to reset all of the user's enrolled factors. Including phone and TOTP factors.
+``multiFactors``       array        An array of multi-factor factors.
 ``deleteProvider``     string|array One or more identity providers to delete.
 ``customAttributes``   array        A list of custom attributes which will be available in a User's ID token.
 ====================== ============ ===========
@@ -299,7 +344,7 @@ Change a user's email
 
     $uid = 'some-uid';
 
-    $updatedUser = $auth->changeUserEmail($uid, 'user@domain.example');
+    $updatedUser = $auth->changeUserEmail($uid, 'user@example.com');
 
 **************
 Disable a user
@@ -395,6 +440,25 @@ This method always returns an instance of ``Kreait\Firebase\Auth\DeleteUsersResu
     Using this method to delete multiple users at once will not trigger ``onDelete()`` event handlers for
     Cloud Functions for Firebase. This is because batch deletes do not trigger a user deletion event on each user.
     Delete users one at a time if you want user deletion events to fire for each deleted user.
+
+*********************************
+Set multi factor authentication
+*********************************
+
+The Firebase Admin SDK allows setting multi-factor authentication for a user, consisting of phone factors. Setting the
+multi-factor authentication overwrites all existing factors. Setting the `mfaEnrollmentId` and `enrolledAt` properties is
+optional. For example:
+
+.. code-block:: php
+
+    $uid = 'some-uid';
+
+    $updatedUser = $auth->updateUser($uid, ['multifactors' => [[
+        'mfaEnrollmentId' => '85dc3f7b-7bef-45b9-b9e6-0a1c2c656fed',
+        'phoneInfo' => '+31123456789',
+        'displayName' => 'foo',
+        'enrolledAt' => '2025-02-28T15:30:00Z',
+    ]]);
 
 **************************************
 Duplicate/Unregistered email addresses
